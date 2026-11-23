@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shoely AI</title>
+<style>
+:root{--bg:#f0f4f4;--card:#fff;--ink:#111827;--mut:#6b7280;--line:#e5e7eb;--side:#0f172a;--pri:#2352d8;--ok:#047857;--okb:#d1fae5;--warn:#b45309;--warnb:#fef3c7;--bad:#b91c1c;--badb:#fee2e2;--info:#1d4ed8;--infob:#dbeafe}
+*{box-sizing:border-box}body{margin:0;font:14px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--ink);display:flex;min-height:100vh}
+nav{width:210px;background:var(--side);color:#cbd5e1;padding:14px 10px;position:sticky;top:0;height:100vh;flex-shrink:0}
+nav h1{color:#fff;font-size:18px;margin:4px 8px 14px}nav h1 small{display:block;font-size:11px;color:#94a3b8;font-weight:400}
+nav a{display:flex;justify-content:space-between;padding:8px 10px;border-radius:6px;cursor:pointer;color:#cbd5e1}nav a:hover{background:#1e293b}nav a.on{background:#1e293b;color:#fff}
+nav .badge{background:var(--pri);color:#fff;border-radius:9px;padding:0 7px;font-size:11px}
+nav .who{position:absolute;bottom:14px;left:14px;font-size:12px;color:#94a3b8}
+main{flex:1;padding:20px 24px;min-width:0}
+h2{margin:0 0 2px}.sub{color:var(--mut);margin-bottom:14px}
+.grid{display:grid;gap:12px}.g4{grid-template-columns:repeat(4,1fr)}.g2{grid-template-columns:2fr 1fr}
+@media(max-width:900px){.g4,.g2{grid-template-columns:1fr 1fr}nav{width:150px}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:12px}
+.kpi b{font-size:26px;display:block}.kpi span{color:var(--mut);font-size:11px;text-transform:uppercase}
+table{width:100%;border-collapse:collapse}th{text-align:left;font-size:11px;color:var(--mut);text-transform:uppercase;padding:6px}td{padding:8px 6px;border-top:1px solid var(--line);vertical-align:top}
+tr.sel{background:#eef2ff}tr.click{cursor:pointer}
+.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;background:#e5e7eb}
+.ok{background:var(--okb);color:var(--ok)}.warn{background:var(--warnb);color:var(--warn)}.bad{background:var(--badb);color:var(--bad)}.info{background:var(--infob);color:var(--info)}
+button{font:inherit;padding:6px 12px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer}button.p{background:var(--pri);color:#fff;border-color:var(--pri)}button.d{color:var(--bad)}button:disabled{opacity:.5;cursor:default}
+input,select,textarea{font:inherit;padding:6px;border:1px solid var(--line);border-radius:6px}textarea{width:100%}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.kv{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line)}
+.mut{color:var(--mut)}.low{color:var(--bad);font-weight:600}
+.chat{height:420px;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:6px}
+.msg{max-width:75%;padding:8px 12px;border-radius:12px;white-space:pre-wrap}.me{align-self:flex-end;background:var(--pri);color:#fff}.bot{background:#eef2f2}
+.bar{height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--pri)}
+#toast{position:fixed;right:18px;bottom:18px;background:#111827;color:#fff;padding:10px 14px;border-radius:8px;display:none;max-width:360px;z-index:9}
+.bars{display:flex;align-items:flex-end;gap:4px;height:120px}.bars i{flex:1;background:var(--pri);border-radius:2px 2px 0 0}.bars i.f{background:#c7d2fe;border:1px dashed var(--pri)}
+</style></head><body>
+<nav id="nav"></nav><main id="main"></main><div id="toast"></div>
+<script>
+// ---------- MOCK DATA (mirrors DB schema sec.13) ----------
+const APPROVAL_LIMIT=2500, TODAY=new Date();
+const iso=d=>d.toISOString().slice(0,10), addD=(n,d=TODAY)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+const daysBetween=(a,b)=>Math.round((new Date(b)-new Date(a))/864e5);
+const S={
+ user:{id:'MGR-012',name:'Marcus Lee',role:'Store Manager'},
+ stores:[{id:'STR-045',name:'Dallas Galleria'},{id:'STR-046',name:'Austin South Congress'}],
+ suppliers:[{id:'SUP-310',name:'Northline Footwear Supply',lead:14,valid:'Yes',channel:'EDI'},{id:'SUP-204',name:'Meridian Sole Works',lead:21,valid:'Yes',channel:'Email'},{id:'SUP-999',name:'Bluefin Imports (unverified)',lead:30,valid:'No',channel:'Portal'}],
+ // item: id,name,style,size,color,cost,supplier, price
+ items:[
+  {id:'ITM-1042',name:'Trail Runner X',style:'Trail Runner',size:'10',color:'Black/Grey',price:38.5,sup:'SUP-310'},
+  {id:'ITM-1043',name:'Trail Runner X',style:'Trail Runner',size:'9',color:'Slate/Lime',price:38.5,sup:'SUP-310'},
+  {id:'ITM-1050',name:'Harbor Chelsea Boot',style:'Chelsea Boot',size:'10',color:'Black',price:58.75,sup:'SUP-204'},
+  {id:'ITM-2001',name:'Court Classic Low',style:'Court Low',size:'8',color:'White/Navy',price:33,sup:'SUP-204'},
+  {id:'ITM-2002',name:'Court Classic Low',style:'Court Low',size:'9',color:'White/Navy',price:33,sup:'SUP-204'},
+  {id:'ITM-2087',name:'Coast Slide',style:'Slide',size:'7',color:'Sand',price:18,sup:'SUP-310'},
+  {id:'ITM-2090',name:'Coast Slide',style:'Slide',size:'9',color:'Navy',price:18,sup:'SUP-310'},
+  {id:'ITM-3001',name:'Metro Loafer',style:'Loafer',size:'11',color:'Tan',price:44,sup:'SUP-999'},
+  {id:'ITM-3002',name:'Peak Hiker',style:'Hiker',size:'10',color:'Olive',price:61,sup:'SUP-204'}],
+ inv:{'ITM-1042':12,'ITM-1043':14,'ITM-1050':6,'ITM-2001':22,'ITM-2002':18,'ITM-2087':240,'ITM-2090':60,'ITM-3001':5,'ITM-3002':30},
+ params:{'ITM-1042':20,'ITM-1043':20,'ITM-1050':12,'ITM-2001':40,'ITM-2002':40,'ITM-2087':20,'ITM-2090':25,'ITM-3001':10}, // 3002 deliberately missing
+ // forecast: predicted demand next 30d, confidence, daily avg sales, days since last sale
+ fc:{'ITM-1042':{d:48,c:'Medium'},'ITM-1043':{d:44,c:'High'},'ITM-1050':{d:46,c:'Medium'},'ITM-2001':{d:166,c:'High'},'ITM-2002':{d:138,c:'High'},'ITM-2087':{d:30,c:'High'},'ITM-2090':{d:20,c:'Low'},'ITM-3001':{d:20,c:'Low'},'ITM-3002':{d:null,c:'Unreliable'}},
+ lastSale:{'ITM-2087':10,'ITM-2090':3,'ITM-1042':0,'ITM-3002':120},
+ recs:[],reqs:[],pos:[],receipts:[],discrepancies:[],flags:[],alerts:[],mlog:[],actions:[],seq:{rec:2040,req:1186,po:5521,rc:3380,dis:730,al:520,act:8800,fl:9010}
+};
+const item=id=>S.items.find(i=>i.id===id), sup=id=>S.suppliers.find(s=>s.id===id);
+const nid=k=>++S.seq[k], fmt$=n=>'$'+Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const iname=id=>{const i=item(id);return `${i.name} · Size ${i.size} · ${i.color}`};
+const pill=(t,c)=>{const m={Pending:'warn','Pending Manager Review':'warn','Pending Auto Approval':'info',Approved:'ok','PO Issued':'ok',Rejected:'bad',Flagged:'bad','Flagged For Review':'bad','On Hold':'bad',delivered:'ok',sent:'info',acknowledged:'info',in_production:'info',shipped:'info',delayed:'bad',critical:'bad',moderate:'warn',minor:'info',high:'bad',medium:'warn',low:'info',open:'warn','Deadstock Risk':'bad',Overstock:'warn',High:'ok',Medium:'warn',Low:'bad',Unreliable:'bad','Handed Off':'info','No Reorder':'ok','Reorder Recommended':'warn'};return `<span class="pill ${c||m[t]||''}">${t}</span>`};
+function toast(t){const e=document.getElementById('toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',3200)}
+function logAction(intent,details,rec){S.actions.unshift({id:'AL-'+nid('act'),intent,details,rec,at:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})})}
+
+// ---------- UC1: monitoring ----------
+function runMonitoring(){
+ let made=0;
+ S.items.forEach(it=>{
+  const th=S.params[it.id], qty=S.inv[it.id], fc=S.fc[it.id];
+  const log=r=>S.mlog.unshift({item:it.id,result:r,at:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})});
+  if(th==null){log('Flagged For Review');return}                       // E2: missing threshold
+  if(S.recs.some(r=>r.item===it.id&&['Pending','Handed Off'].includes(r.status))){return} // no duplicates
+  if(qty<=th){
+   const weak=!fc||fc.d==null||['Low','Unreliable'].includes(fc.c);
+   const sug=weak?Math.max(th-qty,1):Math.max(fc.d-qty,1);          // E3: breach-only qty when forecast weak
+   S.recs.unshift({id:'RR-'+nid('rec'),item:it.id,qty,th,sug,trigger:'Threshold Breach',review:weak?'Yes':'No',status:'Pending',notified:'Sent'});
+   log('Reorder Recommended');made++;
+  } else log('No Reorder');
+ });
+ toast(made?`Monitoring run: ${made} new reorder recommendation(s)`:'Monitoring run: nothing new to recommend');
+ render();
+}
+// ---------- UC3: draft requisition ----------
+function draftRequisition(rec){
+ const it=item(rec.item), s=sup(it.sup), fc=S.fc[it.id];
+ const req={id:'REQ-'+nid('req'),rec:rec.id,item:it.id,sup:s.id,inv:S.inv[it.id],th:rec.th,qty:rec.sug,cost:+(rec.sug*it.price).toFixed(2),limit:APPROVAL_LIMIT,
+  fc:fc,just:fc&&fc.d!=null?`Predicted demand ${fc.d} pairs / 30 days (${fc.c} confidence), on hand ${S.inv[it.id]}.`:'No reliable forecast; quantity restores stock to threshold.',
+  method:null,status:'Draft',created:new Date().toLocaleString(),history:[]};
+ if(!fc||fc.d==null&&rec.review!=='Yes'){req.status='Flagged'}
+ else if(s.valid==='No'){req.status='On Hold';req.note='Supplier not validated'}
+ else if(S.reqs.some(r=>r.item===it.id&&['Pending Manager Review','Pending Auto Approval','Draft'].includes(r.status))){req.status='Flagged';req.note='Open requisition already exists'}
+ else if(req.cost<=APPROVAL_LIMIT&&!['Low','Unreliable'].includes(fc.c)){req.method='Auto';req.status='Pending Auto Approval'}
+ else{req.method='Manager';req.status='Pending Manager Review'}
+ S.reqs.unshift(req);
+ if(req.status==='Pending Auto Approval'){req.history.push({by:'Shoely (auto)',type:'Approved',reason:'Within limit'});issuePO(req)}
+ return req;
+}
+function issuePO(req){
+ const it=item(req.item),s=sup(req.sup);
+ const po={id:'PO-'+nid('po'),req:req.id,sup:s.id,issued:iso(TODAY),ship:iso(addD(7)),deliv:iso(addD(7+Math.max(s.lead-7,3))),status:'sent',lines:[{item:it.id,qty:req.qty,price:it.price}],total:req.cost,updates:[{at:new Date().toLocaleString(),text:`PO transmitted via ${s.channel}`}],delay:null,ackHours:0,alerted:false};
+ S.pos.unshift(po);req.status='PO Issued';
+ const rec=S.recs.find(r=>r.id===req.rec);if(rec)rec.status='Handed Off';
+ return po;
+}
+function approveRec(id){const r=S.recs.find(x=>x.id===id);if(!r||r.status!=='Pending')return null;r.status='Approved';const q=draftRequisition(r);logAction('Approval',`Approved recommendation ${id}`,id);return q}
+function rejectRec(id){const r=S.recs.find(x=>x.id===id);if(!r||r.status!=='Pending')return;r.status='Rejected';logAction('Rejection',`Rejected recommendation ${id}`,id)}
+function decide(reqId,type,reason){const q=S.reqs.find(r=>r.id===reqId);if(['Rejected','Returned For Revision'].includes(type)&&!reason){toast('A reason is required');return}
+ q.history.push({by:S.user.name,type,reason});
+ if(type==='Approved'){issuePO(q);toast('Approved — PO issued')}else{q.status=type;toast(type)}render()}
+
+// ---------- UC5: supplier message parsing + delay ----------
+function parseSupplierMsg(po,msg){
+ const mons={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+ const found=[...msg.matchAll(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})/gi)].map(m=>iso(new Date(TODAY.getFullYear(),mons[m[1].toLowerCase()],+m[2],12)));
+ if(!found.length)return null;
+ const ship=found[0],deliv=found[1]||found[0];
+ return{ship,deliv};
+}
+function trackUpdate(poId,msg){
+ const po=S.pos.find(p=>p.id===poId);const p=parseSupplierMsg(po,msg);
+ if(!p){po.updates.unshift({at:new Date().toLocaleString(),text:'Unclear supplier message → needs manual review: '+msg});toast('Could not parse dates — manual review');render();return}
+ const d=Math.max(daysBetween(po.ship,p.ship),daysBetween(po.deliv,p.deliv));
+ po.updates.unshift({at:new Date().toLocaleString(),text:`Parsed: ship ${p.ship}, delivery ${p.deliv}. ${msg}`});
+ if(d<=0){po.status='acknowledged';toast('On time — acknowledged');render();return}
+ const dos=daysOfSupply(po.lines[0].item);
+ const sev=d>=8||(dos!=null&&dos<d)?'critical':d>=4?'moderate':'minor';
+ po.delay={days:d,sev,revised:p.deliv,expected:po.deliv,reason:'Supplier reported delay'};
+ po.status='delayed';
+ if(sev==='minor')toast(`Minor delay (${d}d) logged`);
+ else{S.alerts.unshift({id:'AL-'+nid('al'),po:po.id,priority:sev==='critical'?'high':'medium',msg:`${po.id} delayed ${d} days (${sev}). Recommended: ${sev==='critical'?'expedite or source alternate supplier':'adjust reorder point'}`,ack:false});toast(`${sev.toUpperCase()} delay — manager alert raised`)}
+ render();
+}
+// ---------- UC6: receive & reconcile ----------
+function reconcile(poId,rows){
+ const po=S.pos.find(p=>p.id===poId);const rid='RCPT-'+nid('rc');let matched=0,variance=0;const ds=[];
+ rows.forEach(r=>{const ord=po.lines.find(l=>l.item===r.item).qty,rcv=+r.qty;const diff=rcv-ord;matched+=Math.min(rcv,ord);variance+=Math.abs(diff);
+  const pct=Math.abs(diff)/ord;
+  if(r.cond!=='good'){const sev=r.cond==='damaged'?'high':'medium';ds.push({type:'damaged_goods',item:r.item,var:r.cond==='damaged'?rcv:Math.max(1,Math.round(rcv*.15)),sev,photo:r.photo,status:r.photo?'open':'pending_documentation',act:r.cond==='damaged'?'return_to_supplier':'request_replacement'})}
+  if(diff<0)ds.push({type:'short_shipment',item:r.item,var:diff,sev:pct>.25?'high':pct>.1?'medium':'low',status:'open',act:'request_credit'});
+  if(diff>0)ds.push({type:'over_shipment',item:r.item,var:diff,sev:pct>.25?'high':pct>.1?'medium':'low',status:'open',act:'accept_variance'});
+  // only accepted good units enter inventory
+  S.inv[r.item]+=Math.max(0,Math.min(rcv,ord)-(r.cond==='damaged'?rcv:0));
+ });
+ const match=ds.length===0?'full_match':ds.length<rows.length?'partial_match':'mismatch';
+ ds.forEach(d=>{d.id='DS-'+nid('dis');d.receipt=rid;S.discrepancies.unshift(d)});
+ S.receipts.unshift({id:rid,po:poId,match,matched,variance,n:ds.length,at:new Date().toLocaleString()});
+ po.status=ds.length?'delivered':'delivered';
+ toast(`${rid}: ${match.replace('_',' ')} — ${ds.length} discrepancy(ies)`);render();
+}
+// ---------- UC7: stock health ----------
+function daysOfSupply(id){const f=S.fc[id];if(!f||f.d==null)return null;if(f.d===0)return Infinity;return S.inv[id]/(f.d/30)}
+function runStockHealth(){
+ S.flags=[];
+ S.items.forEach(it=>{const f=S.fc[it.id];if(!f||f.d==null)return; // excluded: missing data
+  const dos=daysOfSupply(it.id),noSales=(S.lastSale[it.id]??0)>=90;
+  const type=(dos>180||noSales)?'Deadstock Risk':dos>90?'Overstock':null;
+  if(type)S.flags.push({id:'FLG-'+nid('fl'),item:it.id,type,qty:S.inv[it.id],dem:f.d,dos});});
+ toast(`Stock health: ${S.flags.length} item(s) flagged`);render();
+}
+// ---------- UC8: chatbot ----------
+const chat=[{who:'bot',t:"Hi Marcus — ask about stock, give instructions, or approve/reject recommendations. Try: \"How many Trail Runner X size 10 do we have?\", \"Approve the reorder for the Trail Runner X size 10\", \"Where is PO-5521?\", \"Show overstock\", \"Set reorder threshold for Coast Slide size 9 to 40\"."}];
+let pendingConfirm=null;
+function findItems(txt){const t=txt.toLowerCase();const sz=(t.match(/size\s*(\d+)/)||[])[1];
+ return S.items.filter(i=>(t.includes(i.name.toLowerCase())||t.includes(i.style.toLowerCase()))&&(!sz||i.size===sz))}
+function bot(msg){
+ const t=msg.trim(),l=t.toLowerCase();
+ if(pendingConfirm){const p=pendingConfirm;pendingConfirm=null;
+  if(/^(yes|confirm|y)\b/.test(l)){const r=p.run();return r}return'Cancelled — nothing was changed.'}
+ const recId=(t.match(/\bRR-\d+/i)||[])[0],poId=(t.match(/\bPO-\d+/i)||[])[0];
+ if(/\b(approve|reject)\b/.test(l)){
+  const act=/approve/.test(l)?'Approval':'Rejection';
+  let cands=S.recs.filter(r=>r.status==='Pending');
+  if(recId)cands=cands.filter(r=>r.id.toLowerCase()===recId.toLowerCase());
+  else{const its=findItems(t).map(i=>i.id);if(its.length)cands=cands.filter(r=>its.includes(r.item));else return'Which recommendation? Pending: '+cands.map(r=>`${r.id} (${iname(r.item)})`).join('; ')}
+  if(!cands.length)return'I could not find a matching pending recommendation.';
+  if(cands.length>1)return'More than one matches — which one?\n'+cands.map(r=>`• ${r.id}: ${iname(r.item)}, suggest ${r.sug}`).join('\n');
+  const r=cands[0],cost=r.sug*item(r.item).price;
+  const run=()=>{if(act==='Approval'){const q=approveRec(r.id);render();return`${r.id} approved. Requisition ${q.id} is ${q.status}${q.status==='PO Issued'?' and PO sent to supplier':''}.`}rejectRec(r.id);render();return`${r.id} rejected.`};
+  if(act==='Approval'&&cost>APPROVAL_LIMIT){pendingConfirm={run};return`${r.id} would create an order of ${fmt$(cost)}, above the ${fmt$(APPROVAL_LIMIT)} limit. Reply "confirm" to proceed or "cancel".`}
+  return run();
+ }
+ if(/set .*threshold/.test(l)){const its=findItems(t),n=(t.match(/to\s+(\d+)/)||[])[1];
+  if(!its.length)return'I could not find that item.';if(its.length>1)return'Which one?\n'+its.map(i=>'• '+iname(i.id)).join('\n');if(!n)return'What threshold value?';
+  const wide=/all stores|every store/.test(l);const run=()=>{S.params[its[0].id]=+n;logAction('Instruction',`Set reorder threshold for ${iname(its[0].id)} to ${n}`);render();return`Done. Threshold for ${iname(its[0].id)} is now ${n}; monitored from the next run.`};
+  if(wide){pendingConfirm={run};return'That affects multiple stores. Reply "confirm" to proceed.'}return run()}
+ if(/run (the )?monitoring|check reorder/.test(l)){runMonitoring();logAction('Instruction','Ran monitoring');return'Monitoring run complete. See Monitoring tab for new recommendations.'}
+ if(/overstock|deadstock|stock health/.test(l)){runStockHealth();return S.flags.length?'Flagged:\n'+S.flags.map(f=>`• ${iname(f.item)}: ${f.type}, ${f.dos===Infinity?'∞':Math.round(f.dos)} days of supply`).join('\n'):'No overstock or deadstock risk found.'}
+ if(poId){const po=S.pos.find(p=>p.id.toLowerCase()===poId.toLowerCase());return po?`${po.id} (${sup(po.sup).name}): ${po.status}. Expected ship ${po.ship}, delivery ${po.deliv}.${po.delay?` Delay: ${po.delay.days} days (${po.delay.sev}).`:''}`:'PO not found.'}
+ if(/pending|waiting|recommendation/.test(l)){const p=S.recs.filter(r=>r.status==='Pending');return p.length?p.map(r=>`• ${r.id}: ${iname(r.item)} — on hand ${r.qty}/${r.th}, suggest ${r.sug}`).join('\n'):'No pending recommendations.'}
+ if(/stock|how many|inventory|have|on hand/.test(l)){const its=findItems(t);if(!its.length)return'I could not find that item or store.';
+  return its.map(i=>{const rec=S.recs.find(r=>r.item===i.id&&r.status==='Pending');return`${iname(i.id)} @ Dallas Galleria: ${S.inv[i.id]} on hand, threshold ${S.params[i.id]??'not set'}.${rec?` Recommendation ${rec.id} suggests ${rec.sug} and is waiting for approval.`:''}`}).join('\n')}
+ return"I'm not sure what you want — is that a query, an instruction, or an approval/rejection? Could you rephrase?";
+}
+function sendChat(txt){if(!txt.trim())return;chat.push({who:'me',t:txt});chat.push({who:'bot',t:bot(txt)});render();const c=document.getElementById('chatbox');if(c)c.scrollTop=c.scrollHeight}
+
+// ---------- UI ----------
+let tab='dashboard',sel={rec:null,po:null,req:null};
+const tabs=[['dashboard','Dashboard'],['monitoring','Monitoring'],['forecasts','Forecasts'],['requisitions','Requisitions'],['approvals','Approvals'],['pos','Purchase orders'],['receiving','Receiving'],['health','Stock health'],['assistant','Assistant']];
+const open=o=>o.status&&['Pending Manager Review'].includes(o.status);
+function render(){
+ const cnt={monitoring:S.recs.filter(r=>r.status==='Pending').length,approvals:S.reqs.filter(open).length};
+ document.getElementById('nav').innerHTML=`<h1>Shoely<small>Agentic inventory replenishment</small></h1>`+tabs.map(([k,n])=>`<a class="${tab===k?'on':''}" onclick="tab='${k}';render()">${n}${cnt[k]?`<span class="badge">${cnt[k]}</span>`:''}</a>`).join('')+`<div class="who">${S.user.name}<br>${S.user.role}</div>`;
+ document.getElementById('main').innerHTML=V[tab]();
+ const c=document.getElementById('chatbox');if(c)c.scrollTop=c.scrollHeight;
+}
+const V={
+dashboard(){
+ const pend=S.recs.filter(r=>r.status==='Pending'),del=S.pos.filter(p=>p.status==='delayed');
+ return`<div class="row" style="justify-content:space-between"><div><h2>Dashboard</h2><div class="sub">Shoely monitors every style/size/colorway and escalates what needs you.</div></div><div class="row"><button onclick="runStockHealth()">Run stock health</button><button class="p" onclick="runMonitoring()">Run monitoring now</button></div></div>
+ <div class="grid g4"><div class="card kpi"><span>Reorder recs pending</span><b>${pend.length}</b></div><div class="card kpi"><span>Open POs</span><b>${S.pos.filter(p=>p.status!=='delivered').length}</b></div><div class="card kpi"><span>Awaiting your approval</span><b>${S.reqs.filter(open).length}</b></div><div class="card kpi"><span>Stock health flags</span><b>${S.flags.length}</b></div></div>
+ <div class="grid g2"><div class="card"><b>Reorder recommendations</b>${recTable(S.recs.slice(0,6))}</div>
+ <div><div class="card"><b>Manager alerts</b>${S.alerts.length?S.alerts.map(a=>`<div class="kv"><span>${a.msg}</span>${pill(a.priority)}</div>`).join(''):'<div class="mut">No alerts. Simulate a supplier delay in Purchase orders.</div>'}</div>
+ <div class="card"><b>Monitoring log</b>${S.mlog.slice(0,6).map(m=>`<div class="kv"><span>${iname(m.item)}</span>${pill(m.result)}</div>`).join('')||'<div class="mut">No runs yet — click "Run monitoring now".</div>'}</div></div></div>`},
+monitoring(){
+ const r=S.recs.find(x=>x.id===sel.rec);
+ return`<div class="row" style="justify-content:space-between"><div><h2>Monitoring</h2><div class="sub">Recommendations raised when stock hits its reorder threshold (UC1).</div></div><button class="p" onclick="runMonitoring()">Run monitoring now</button></div>
+ <div class="grid g2"><div class="card">${recTable(S.recs,true)}
+ <h4>Monitoring parameters</h4><table><tr><th>Item</th><th>On hand</th><th>Threshold</th><th></th></tr>${S.items.map(i=>`<tr><td>${iname(i.id)}</td><td>${S.inv[i.id]}</td><td>${S.params[i.id]??'<span class="low">Missing — flagged</span>'}</td><td><button onclick="const v=prompt('Reorder threshold for ${i.id}',${S.params[i.id]??20});if(v!==null){S.params['${i.id}']=+v;logAction('Instruction','Set threshold ${i.id} to '+v);render()}">Edit</button></td></tr>`).join('')}</table></div>
+ <div class="card">${r?`<b>${iname(r.item)}</b><div class="mut">${r.id}</div>${kv('Quantity on hand',r.qty)}${kv('Reorder threshold',r.th)}${kv('Suggested quantity',r.sug)}${kv('Trigger',r.trigger)}${kv('Review flag',r.review)}${kv('Status',pill(r.status))}${kv('Notification',r.notified)}
+ ${r.status==='Pending'?`<div class="row" style="margin-top:10px"><button class="p" onclick="approveRec('${r.id}');toast('Approved → requisition drafted');render()">Approve</button><button class="d" onclick="rejectRec('${r.id}');render()">Reject</button></div>`:''}`:'<span class="mut">Select a recommendation.</span>'}</div></div>`},
+forecasts(){
+ return`<h2>Demand forecasts</h2><div class="sub">30-day LLM-generated forecast per SKU with confidence (UC2). Low/Unreliable forecasts force manager review.</div>
+ <div class="card"><table><tr><th>Item</th><th>On hand</th><th>Predicted demand</th><th>Confidence</th><th>Review flag</th><th>Trend (12 wks)</th></tr>${S.items.map(i=>{const f=S.fc[i.id];const seed=i.id.charCodeAt(5)+i.id.charCodeAt(6);const h=Array.from({length:8},(_,k)=>12+((seed*(k+3))%9)+(f.d?k*(f.d/60):0));
+ return`<tr><td>${iname(i.id)}</td><td>${S.inv[i.id]}</td><td>${f.d??'—'}</td><td>${pill(f.c)}</td><td>${['Low','Unreliable'].includes(f.c)?pill('Yes','warn'):'No'}</td><td><div class="bars" style="height:30px;width:120px">${h.map(v=>`<i style="height:${Math.min(100,v*2.2)}%"></i>`).join('')}<i class="f" style="height:${Math.min(100,(f.d||10)/1.5)}%"></i></div></td></tr>`}).join('')}</table></div>`},
+requisitions(){
+ return`<h2>Requisitions</h2><div class="sub">Drafted by the agent from approved recommendations. Auto-approved when ≤ ${fmt$(APPROVAL_LIMIT)} and forecast confidence is not Low/Unreliable (UC3).</div>
+ <div class="card"><table><tr><th>ID</th><th>Item</th><th>Supplier</th><th>Qty</th><th>Cost</th><th>Method</th><th>Status</th></tr>${S.reqs.map(q=>`<tr><td>${q.id}</td><td>${iname(q.item)}<div class="mut">${q.just}${q.note?' — '+q.note:''}</div></td><td>${sup(q.sup).name}</td><td>${q.qty}</td><td>${fmt$(q.cost)}</td><td>${q.method||'—'}</td><td>${pill(q.status)}</td></tr>`).join('')||'<tr><td colspan=7 class="mut">None yet. Approve a recommendation in Monitoring.</td></tr>'}</table></div>`},
+approvals(){
+ const q=S.reqs.filter(open);
+ return`<h2>Approvals</h2><div class="sub">Requisitions above the limit or with weak forecasts. The system never decides for you (UC4).</div>
+ ${q.map(r=>`<div class="card"><div class="row" style="justify-content:space-between"><b>${r.id} — ${iname(r.item)}</b>${pill(r.status)}</div>
+ ${kv('Supplier',sup(r.sup).name)}${kv('Inventory / threshold',`${r.inv} / ${r.th}`)}${kv('Recommended qty',r.qty)}${kv('Forecast',r.fc&&r.fc.d!=null?`${r.fc.d} (${r.fc.c})`:'none')}${kv('Total cost',`${fmt$(r.cost)} vs limit ${fmt$(r.limit)}`)}${kv('Justification',r.just)}
+ <textarea id="why-${r.id}" placeholder="Reason (required to reject / return)" rows="2" style="margin:8px 0"></textarea>
+ <div class="row"><button class="p" onclick="decide('${r.id}','Approved')">Approve and issue PO</button><button onclick="decide('${r.id}','Returned For Revision',document.getElementById('why-${r.id}').value)">Return for revision</button><button class="d" onclick="decide('${r.id}','Rejected',document.getElementById('why-${r.id}').value)">Reject</button></div></div>`).join('')||'<div class="card mut">Nothing waiting for approval. Approve a larger recommendation (e.g. Court Classic Low) to see one here.</div>'}`},
+pos(){
+ const p=S.pos.find(x=>x.id===sel.po)||S.pos[0];
+ return`<h2>Purchase orders</h2><div class="sub">Send POs and track supplier status; delays are classified minor (1–3d), moderate (4–7d), critical (8+d or stockout risk) (UC5).</div>
+ <div class="grid g2"><div class="card"><table><tr><th>PO</th><th>Supplier</th><th>Ship / Delivery</th><th>Total</th><th>Status</th></tr>${S.pos.map(x=>`<tr class="click ${p&&x.id===p.id?'sel':''}" onclick="sel.po='${x.id}';render()"><td>${x.id}</td><td>${sup(x.sup).name}</td><td>${x.ship} / ${x.deliv}</td><td>${fmt$(x.total)}</td><td>${pill(x.status)}</td></tr>`).join('')||'<tr><td colspan=5 class="mut">No POs yet.</td></tr>'}</table></div>
+ <div>${p?`<div class="card"><b>${p.id}</b> ${pill(p.status)}${p.lines.map(l=>kv(iname(l.item),`${l.qty} × ${fmt$(l.price)}`)).join('')}
+ ${p.delay?`<div style="margin-top:8px">${pill(p.delay.sev)} delayed ${p.delay.days} days (revised delivery ${p.delay.revised})</div>`:''}
+ <h4>Simulate supplier email</h4><textarea id="smsg" rows="3">Hi team, production ran behind on ${p.id}. We now expect to ship around ${fmtMon(addD(18))} and delivery should be about ${fmtMon(addD(26))}.</textarea>
+ <div class="row" style="margin-top:6px"><button class="p" onclick="trackUpdate('${p.id}',document.getElementById('smsg').value)">Parse &amp; evaluate</button><button onclick="const q=S.pos.find(x=>x.id=='${p.id}');q.status='shipped';q.updates.unshift({at:new Date().toLocaleString(),text:'Supplier: shipped'});render()">Mark shipped</button></div>
+ <h4>Status updates</h4>${p.updates.map(u=>`<div class="kv"><span>${u.text}</span><span class="mut">${u.at}</span></div>`).join('')}</div>
+ <div class="card"><b>Manager alerts</b>${S.alerts.map(a=>`<div class="kv"><span>${a.msg}</span>${a.ack?pill('ack','ok'):`<button onclick="S.alerts.find(x=>x.id=='${a.id}').ack=true;render()">Acknowledge</button>`}</div>`).join('')||'<div class="mut">None</div>'}</div>`:''}</div></div>`},
+receiving(){
+ const open=S.pos.filter(p=>p.status!=='delivered');const p=S.pos.find(x=>x.id===sel.rpo)||open[0];
+ return`<h2>Receiving</h2><div class="sub">Log what arrived; Shoely reconciles against the PO and routes discrepancies to you with a recommended action (UC6).</div>
+ ${p?`<div class="card"><div class="row"><b>Receive against</b><select onchange="sel.rpo=this.value;render()">${open.map(x=>`<option ${x.id===p.id?'selected':''}>${x.id}</option>`).join('')}</select></div>
+ <table><tr><th>Item</th><th>Ordered</th><th>Received</th><th>Condition</th><th>Photo evidence</th></tr>${p.lines.map((l,i)=>`<tr><td>${iname(l.item)}</td><td>${l.qty}</td><td><input id="rq${i}" type="number" value="${l.qty-6}" style="width:80px"></td><td><select id="rc${i}"><option>good</option><option>partial_damage</option><option>damaged</option></select></td><td><label><input id="rp${i}" type="checkbox"> attached</label></td></tr>`).join('')}</table>
+ <button class="p" style="margin-top:8px" onclick="reconcile('${p.id}',[${p.lines.map((l,i)=>`{item:'${l.item}',qty:document.getElementById('rq${i}').value,cond:document.getElementById('rc${i}').value,photo:document.getElementById('rp${i}').checked}`).join(',')}])">Reconcile shipment</button></div>`:'<div class="card mut">No open POs to receive. Approve a recommendation first.</div>'}
+ <div class="card"><b>Receipts</b>${S.receipts.map(r=>kv(`${r.id} · ${r.po}`,`${pill(r.match.replace('_',' '),r.match==='full_match'?'ok':'warn')} ${r.n} discrepancies`)).join('')||'<div class="mut">None</div>'}</div>
+ <div class="card"><b>Discrepancies</b><table><tr><th>ID</th><th>Item</th><th>Type</th><th>Variance</th><th>Severity</th><th>Recommended</th><th>Status</th></tr>${S.discrepancies.map(d=>`<tr><td>${d.id}</td><td>${iname(d.item)}</td><td>${d.type}</td><td>${d.var}</td><td>${pill(d.sev)}</td><td>${d.act}</td><td>${d.status==='pending_documentation'?pill('pending documentation','warn'):d.status==='resolved'?pill('resolved','ok'):`<button onclick="S.discrepancies.find(x=>x.id=='${d.id}').status='resolved';render()">Approve action</button>`}</td></tr>`).join('')||'<tr><td colspan=7 class="mut">None</td></tr>'}</table></div>`},
+health(){
+ return`<div class="row" style="justify-content:space-between"><div><h2>Stock health</h2><div class="sub">Days of supply = on hand ÷ forecast daily demand. >90 = Overstock; >180 or no sales in 90 days = Deadstock Risk (UC7).</div></div><button class="p" onclick="runStockHealth()">Run analysis</button></div>
+ <div class="card"><table><tr><th>Item</th><th>On hand</th><th>Demand/30d</th><th>Days of supply</th><th>Flag</th></tr>${S.flags.map(f=>`<tr><td>${iname(f.item)}</td><td>${f.qty}</td><td>${f.dem}</td><td>${f.dos===Infinity?'∞':Math.round(f.dos)}</td><td>${pill(f.type)}</td></tr>`).join('')||'<tr><td colspan=5 class="mut">Run the analysis to flag items.</td></tr>'}</table></div>`},
+assistant(){
+ return`<h2>Assistant</h2><div class="sub">Natural language queries, instructions and approvals (UC8). Every action is logged.</div>
+ <div class="grid g2"><div class="card"><div class="chat" id="chatbox">${chat.map(m=>`<div class="msg ${m.who}">${m.t.replace(/</g,'&lt;')}</div>`).join('')}</div>
+ <form class="row" onsubmit="event.preventDefault();const i=this.q;sendChat(i.value);" style="margin-top:8px"><input name="q" style="flex:1" placeholder="Ask about stock or give an instruction" autofocus><button class="p">Send</button></form>
+ <div class="row" style="margin-top:6px">${['Show pending recommendations','Run monitoring','Show overstock','Where is PO-5521?'].map(q=>`<button onclick="sendChat('${q}')">${q}</button>`).join('')}</div></div>
+ <div class="card"><b>Action log</b>${S.actions.map(a=>`<div class="kv"><span>${pill(a.intent,a.intent==='Rejection'?'bad':a.intent==='Approval'?'ok':'info')} ${a.details}</span><span class="mut">${a.at}</span></div>`).join('')||'<div class="mut">Nothing yet.</div>'}</div></div>`}
+};
+function kv(a,b){return`<div class="kv"><span class="mut">${a}</span><span>${b}</span></div>`}
+function fmtMon(d){return d.toLocaleString('en-US',{month:'long',day:'numeric'})}
+function recTable(rows,clickable){return`<table><tr><th>ID</th><th>Item</th><th>On hand/min</th><th>Suggest</th><th>Status</th></tr>${rows.map(r=>`<tr class="${clickable?'click':''} ${sel.rec===r.id?'sel':''}" ${clickable?`onclick="sel.rec='${r.id}';render()"`:''}><td>${r.id}</td><td>${iname(r.item)}</td><td><span class="low">${r.qty}</span> / ${r.th}</td><td>${r.sug}${r.review==='Yes'?' <span class="pill warn">review</span>':''}</td><td>${pill(r.status)}</td></tr>`).join('')||'<tr><td colspan=5 class="mut">No recommendations yet — run monitoring.</td></tr>'}</table>`}
+// seed one open PO so Receiving/PO tracking demo works immediately
+(function(){const it=item('ITM-2090');S.pos.push({id:'PO-5521',req:'REQ-1180',sup:'SUP-204',issued:iso(addD(-7)),ship:iso(addD(2)),deliv:iso(addD(9)),status:'in_production',lines:[{item:'ITM-1050',qty:60,price:58.75}],total:3525,updates:[{at:new Date().toLocaleString(),text:'Supplier: in production'}],delay:null});S.pos[0].id='PO-5521'})();
+render();
+</script></body></html>

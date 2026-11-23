@@ -1,0 +1,11 @@
+{
+  "name": "shoely-ai",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node --no-warnings --env-file-if-exists=.env server/index.js",
+    "seed": "node --no-warnings server/seed.js",
+    "test": "node --no-warnings server/test.js"
+  }
+}
