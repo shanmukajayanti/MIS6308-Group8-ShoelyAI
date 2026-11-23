@@ -10,6 +10,24 @@ It includes a **Claude-powered agentic chatbot** that can look up real data and 
 
 ---
 
+## Key business features
+
+| # | Feature | What the business gets |
+|---|---|---|
+| 1 | **Automatic low-stock detection** | Every size at every store is checked against its reorder threshold. Problems are caught before a customer asks for a size that isn't there. Stale or missing data is flagged, never guessed |
+| 2 | **Demand forecasting with confidence** | 30-day predictions from sales history and seasonality, each labelled High / Medium / Low / Unreliable, so reorder quantities are not gut feel |
+| 3 | **Spend-controlled approvals** | Orders under the auto-approval limit (default $1,500) with a confident forecast become POs automatically. Larger or uncertain ones wait for the manager. Unanswered approvals escalate after 24 h / 48 h |
+| 4 | **Supplier tracking and delay intelligence** | Paste any supplier reply and the system extracts status and dates. Delays are rated minor / moderate / critical, including whether stock would run out first. Late acknowledgements trigger automatic follow-ups |
+| 5 | **Receiving and discrepancy handling** | Deliveries are matched to the PO. Shortages, overages, wrong items and damage get a severity and a recommended remedy. Damage claims need photo evidence before anything goes to the supplier |
+| 6 | **Overstock and dead-stock alerts** | Days-of-supply analysis flags cash tied up in slow sellers |
+| 7 | **Agentic chatbot** | A Claude assistant that looks up live data, chains steps, and takes real actions (approve, reject, set thresholds, run checks) from plain English, with confirmation prompts for high-impact actions and a full audit trail |
+
+**Why it matters:** the agents prepare the work and the manager keeps the authority. The agents never approve a requisition for the manager. The system flags uncertainty instead of guessing, and it keeps working with rule-based fallbacks if the AI is unavailable.
+
+Full detail: [BUSINESS_FEATURES.md](BUSINESS_FEATURES.md) · Technical design: [TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md)
+
+---
+
 ## Quick start (copy and paste)
 
 If you already have Node 22+ and an Anthropic API key, this is all you need:
